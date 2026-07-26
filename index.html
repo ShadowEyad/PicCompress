@@ -298,7 +298,6 @@
             background: rgba(16, 185, 129, 0.1);
         }
 
-        /* Upload Dropzone */
         .dropzone {
             border: 2px dashed var(--border-color);
             border-radius: var(--radius-inner);
@@ -333,7 +332,6 @@
             color: var(--text-secondary);
         }
 
-        /* Summary Stats Banner */
         .summary-banner {
             background: rgba(16, 185, 129, 0.08);
             border: 1px solid rgba(16, 185, 129, 0.25);
@@ -357,7 +355,6 @@
             font-weight: 800;
         }
 
-        /* Compression Results Table / List */
         .results-header {
             display: flex;
             align-items: center;
@@ -493,6 +490,22 @@
             color: var(--accent-emerald);
         }
 
+        .btn-copy-data {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 7px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-copy-data:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
         .btn-remove-single {
             background: transparent;
             border: 1px solid var(--border-color);
@@ -577,7 +590,7 @@
             .action-btns-cell {
                 width: 100%;
             }
-            .btn-dl-single {
+            .btn-dl-single, .btn-copy-data {
                 flex: 1;
                 text-align: center;
             }
@@ -626,9 +639,9 @@
                     <input type="range" id="input-quality" class="range-slider" min="10" max="100" value="75">
                     
                     <div class="preset-quality-row">
-                        <button class="pill-preset" data-q="50">Max Compression (50%)</button>
+                        <button class="pill-preset" data-q="50">Max (50%)</button>
                         <button class="pill-preset active" data-q="75">Balanced (75%)</button>
-                        <button class="pill-preset" data-q="90">High Quality (90%)</button>
+                        <button class="pill-preset" data-q="90">High (90%)</button>
                     </div>
                 </div>
 
@@ -719,7 +732,7 @@
         </div>
     </footer>
 
-    <!-- Async Compression Engine with Individual Remove -->
+    <!-- Async Compression Engine with Copy Data URL -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const dropzone = document.getElementById('dropzone');
@@ -904,12 +917,21 @@
                         </div>
                     </div>
                     <div class="action-btns-cell">
+                        <button class="btn-copy-data" data-copy="${itemId}">Copy Base64</button>
                         <a href="${dataUrl}" download="${outName}" class="btn-dl-single">Download</a>
                         <button class="btn-remove-single" data-remove="${itemId}" title="Remove file">
                             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
                 `;
+
+                card.querySelector('[data-copy]').addEventListener('click', (e) => {
+                    navigator.clipboard.writeText(dataUrl).then(() => {
+                        const originalTxt = e.target.textContent;
+                        e.target.textContent = 'Copied!';
+                        setTimeout(() => e.target.textContent = originalTxt, 2000);
+                    });
+                });
 
                 card.querySelector('[data-remove]').addEventListener('click', () => {
                     loadedImageObjects = loadedImageObjects.filter(obj => obj.id !== itemId);
