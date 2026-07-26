@@ -469,6 +469,13 @@
             font-weight: 700;
         }
 
+        .action-btns-cell {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
         .btn-dl-single {
             background: var(--bg-surface);
             border: 1px solid var(--border-color);
@@ -478,13 +485,29 @@
             font-size: 11px;
             font-weight: 600;
             cursor: pointer;
-            flex-shrink: 0;
             text-decoration: none;
         }
 
         .btn-dl-single:hover {
             border-color: var(--accent-emerald);
             color: var(--accent-emerald);
+        }
+
+        .btn-remove-single {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-tertiary);
+            padding: 7px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-remove-single:hover {
+            color: #ef4444;
+            border-color: #ef4444;
         }
 
         .faq-section {
@@ -551,8 +574,11 @@
             .file-name {
                 max-width: 100%;
             }
-            .btn-dl-single {
+            .action-btns-cell {
                 width: 100%;
+            }
+            .btn-dl-single {
+                flex: 1;
                 text-align: center;
             }
             .privacy-badge span {
@@ -693,7 +719,7 @@
         </div>
     </footer>
 
-    <!-- Clean Async Compression Engine -->
+    <!-- Async Compression Engine with Individual Remove -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const dropzone = document.getElementById('dropzone');
@@ -775,7 +801,7 @@
                         const reader = new FileReader();
                         reader.onload = (e) => {
                             const img = new Image();
-                            img.onload = () => resolve({ file: file, img: img });
+                            img.onload = () => resolve({ id: Date.now() + Math.random(), file: file, img: img });
                             img.src = e.target.result;
                         };
                         reader.readAsDataURL(file);
@@ -797,7 +823,14 @@
             }
 
             function reprocessAll() {
-                if (!loadedImageObjects.length) return;
+                if (!loadedImageObjects.length) {
+                    emptyState.style.display = 'block';
+                    resultsHeader.style.display = 'none';
+                    summaryBanner.style.display = 'none';
+                    fileList.innerHTML = '';
+                    return;
+                }
+
                 emptyState.style.display = 'none';
                 resultsHeader.style.display = 'flex';
                 summaryBanner.style.display = 'flex';
@@ -807,8 +840,8 @@
                 let totalOrigBytes = 0;
                 let totalCompBytes = 0;
 
-                loadedImageObjects.forEach((item) => {
-                    const res = compressSingleImage(item.file, item.img);
+                loadedImageObjects.forEach((item, idx) => {
+                    const res = compressSingleImage(item, idx);
                     totalOrigBytes += item.file.size;
                     totalCompBytes += res.sizeInBytes;
                 });
@@ -818,7 +851,9 @@
                 summarySavedVal.textContent = `${formatBytes(totalSavedBytes)} Saved (-${totalSavingsPercent}%)`;
             }
 
-            function compressSingleImage(file, img) {
+            function compressSingleImage(item, idx) {
+                const file = item.file;
+                const img = item.img;
                 const canvas = document.createElement('canvas');
                 const targetW = Math.max(1, Math.round(img.width * currentScale));
                 const targetH = Math.max(1, Math.round(img.height * currentScale));
@@ -847,14 +882,15 @@
                 const outName = baseName + '-compressed' + ext;
 
                 compressedResults.push({ name: outName, url: dataUrl });
-                renderFileCard(file.name, origSize, sizeInBytes, savings, dataUrl, outName, targetW, targetH);
+                renderFileCard(item.id, file.name, origSize, sizeInBytes, savings, dataUrl, outName, targetW, targetH);
 
                 return { sizeInBytes: sizeInBytes };
             }
 
-            function renderFileCard(origName, origSize, compSize, savings, dataUrl, outName, w, h) {
+            function renderFileCard(itemId, origName, origSize, compSize, savings, dataUrl, outName, w, h) {
                 const card = document.createElement('div');
                 card.className = 'file-card';
+                card.dataset.id = itemId;
 
                 card.innerHTML = `
                     <div class="file-info">
@@ -867,8 +903,18 @@
                             </div>
                         </div>
                     </div>
-                    <a href="${dataUrl}" download="${outName}" class="btn-dl-single">Download</a>
+                    <div class="action-btns-cell">
+                        <a href="${dataUrl}" download="${outName}" class="btn-dl-single">Download</a>
+                        <button class="btn-remove-single" data-remove="${itemId}" title="Remove file">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
                 `;
+
+                card.querySelector('[data-remove]').addEventListener('click', () => {
+                    loadedImageObjects = loadedImageObjects.filter(obj => obj.id !== itemId);
+                    reprocessAll();
+                });
 
                 fileList.appendChild(card);
             }
