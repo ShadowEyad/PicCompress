@@ -607,7 +607,7 @@
         </div>
     </footer>
 
-    <!-- Browser Compression Engine -->
+    <!-- Debounced Browser Compression Engine -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const dropzone = document.getElementById('dropzone');
@@ -625,10 +625,14 @@
             let currentScale = 1.0;
             let loadedFiles = [];
             let compressedResults = [];
+            let debounceTimer = null;
+            let loadedImageObjects = [];
 
+            // Debounced slider logic to prevent infinite reprocess loops
             qualityInput.addEventListener('input', () => {
                 valQuality.textContent = `${qualityInput.value}%`;
-                reprocessAll();
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(reprocessAll, 120);
             });
 
             selectFormat.addEventListener('change', reprocessAll);
@@ -660,10 +664,18 @@
             function handleFiles(files) {
                 Array.from(files).forEach(file => {
                     if (file.type.startsWith('image/')) {
-                        loadedFiles.push(file);
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const img = new Image();
+                            img.onload = () => {
+                                loadedImageObjects.push({ file: file, img: img });
+                                reprocessAll();
+                            };
+                            img.src = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
                     }
                 });
-                reprocessAll();
             }
 
             function formatBytes(bytes) {
@@ -675,55 +687,46 @@
             }
 
             function reprocessAll() {
-                if (!loadedFiles.length) return;
+                if (!loadedImageObjects.length) return;
                 emptyState.style.display = 'none';
                 resultsHeader.style.display = 'flex';
                 fileList.innerHTML = '';
                 compressedResults = [];
 
-                loadedFiles.forEach((file, idx) => {
-                    compressSingleImage(file, idx);
+                loadedImageObjects.forEach((item, idx) => {
+                    compressSingleImage(item.file, item.img, idx);
                 });
             }
 
-            function compressSingleImage(file, idx) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const targetW = Math.round(img.width * currentScale);
-                        const targetH = Math.round(img.height * currentScale);
+            function compressSingleImage(file, img, idx) {
+                const canvas = document.createElement('canvas');
+                const targetW = Math.round(img.width * currentScale);
+                const targetH = Math.round(img.height * currentScale);
 
-                        canvas.width = targetW;
-                        canvas.height = targetH;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, targetW, targetH);
+                canvas.width = targetW;
+                canvas.height = targetH;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, targetW, targetH);
 
-                        const format = selectFormat.value;
-                        const quality = parseInt(qualityInput.value) / 100;
-                        const dataUrl = canvas.toDataURL(format, quality);
+                const format = selectFormat.value;
+                const quality = parseInt(qualityInput.value) / 100;
+                const dataUrl = canvas.toDataURL(format, quality);
 
-                        // Calculate Compressed Size
-                        const head = `data:${format};base64,`;
-                        const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
+                const head = `data:${format};base64,`;
+                const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
 
-                        const origSize = file.size;
-                        const savings = Math.max(0, Math.round((1 - sizeInBytes / origSize) * 100));
+                const origSize = file.size;
+                const savings = Math.max(0, Math.round((1 - sizeInBytes / origSize) * 100));
 
-                        let ext = '.webp';
-                        if (format === 'image/jpeg') ext = '.jpg';
-                        else if (format === 'image/png') ext = '.png';
+                let ext = '.webp';
+                if (format === 'image/jpeg') ext = '.jpg';
+                else if (format === 'image/png') ext = '.png';
 
-                        const outName = file.name.substring(0, file.name.lastIndexOf('.')) + '-compressed' + ext;
+                const baseName = file.name.contains && file.name.contains('.') ? file.name.substring(0, file.name.lastIndexOf('.')) : file.name;
+                const outName = baseName + '-compressed' + ext;
 
-                        compressedResults.push({ name: outName, url: dataUrl });
-
-                        renderFileCard(file.name, origSize, sizeInBytes, savings, dataUrl, outName);
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
+                compressedResults.push({ name: outName, url: dataUrl });
+                renderFileCard(file.name, origSize, sizeInBytes, savings, dataUrl, outName);
             }
 
             function renderFileCard(origName, origSize, compSize, savings, dataUrl, outName) {
