@@ -237,6 +237,31 @@
             cursor: pointer;
         }
 
+        .preset-quality-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .pill-preset {
+            background: var(--bg-page);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 6px 4px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .pill-preset:hover, .pill-preset.active {
+            border-color: var(--accent-emerald);
+            color: var(--accent-emerald);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
         .select-input {
             width: 100%;
             background: var(--bg-page);
@@ -308,19 +333,49 @@
             color: var(--text-secondary);
         }
 
+        /* Summary Stats Banner */
+        .summary-banner {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            border-radius: var(--radius-inner);
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .summary-txt {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .summary-val {
+            color: var(--accent-emerald);
+            font-family: var(--font-mono);
+            font-weight: 800;
+        }
+
         /* Compression Results Table / List */
         .results-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 12px;
+            gap: 8px;
+        }
+
+        .header-btns {
+            display: flex;
+            gap: 8px;
         }
 
         .btn-batch-download {
             background: var(--accent-emerald);
             color: #ffffff;
             border: none;
-            padding: 8px 16px;
+            padding: 8px 14px;
             border-radius: 8px;
             font-size: 12px;
             font-weight: 700;
@@ -333,6 +388,22 @@
 
         .btn-batch-download:hover {
             background: #059669;
+        }
+
+        .btn-clear-all {
+            background: var(--bg-page);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-clear-all:hover {
+            color: #ef4444;
+            border-color: #ef4444;
         }
 
         .file-list {
@@ -520,13 +591,19 @@
                     <span class="panel-title">Compress Settings</span>
                 </div>
 
-                <!-- Quality Control Slider -->
+                <!-- Quality Control Slider & Presets -->
                 <div class="control-group">
                     <div class="label-row">
                         <span>Image Quality</span>
                         <span id="val-quality" style="color: var(--accent-emerald); font-weight: 700;">75%</span>
                     </div>
                     <input type="range" id="input-quality" class="range-slider" min="10" max="100" value="75">
+                    
+                    <div class="preset-quality-row">
+                        <button class="pill-preset" data-q="50">Max Compression (50%)</button>
+                        <button class="pill-preset active" data-q="75">Balanced (75%)</button>
+                        <button class="pill-preset" data-q="90">High Quality (90%)</button>
+                    </div>
                 </div>
 
                 <!-- Output Format -->
@@ -563,10 +640,19 @@
                     <p>Or click to browse PNG, JPG, WebP files from your computer</p>
                 </div>
 
+                <!-- Summary Savings Banner -->
+                <div class="summary-banner" id="summary-banner" style="display: none;">
+                    <span class="summary-txt">Total Space Saved</span>
+                    <span class="summary-val" id="summary-saved-val">0 KB Saved (-0%)</span>
+                </div>
+
                 <!-- Results Header -->
                 <div class="results-header" id="results-header" style="display: none;">
                     <span class="panel-title">Compressed Output Files</span>
-                    <button class="btn-batch-download" id="btn-dl-all">Download All Images</button>
+                    <div class="header-btns">
+                        <button class="btn-clear-all" id="btn-clear">Clear All</button>
+                        <button class="btn-batch-download" id="btn-dl-all">Download All Images</button>
+                    </div>
                 </div>
 
                 <!-- Card List of Compressed Files -->
@@ -614,12 +700,16 @@
             const fileInput = document.getElementById('file-input');
             const qualityInput = document.getElementById('input-quality');
             const valQuality = document.getElementById('val-quality');
+            const pillPresets = document.querySelectorAll('.pill-preset');
             const selectFormat = document.getElementById('select-format');
             const scaleBtns = document.querySelectorAll('.scale-btn');
             const fileList = document.getElementById('file-list');
             const emptyState = document.getElementById('empty-state');
             const resultsHeader = document.getElementById('results-header');
+            const summaryBanner = document.getElementById('summary-banner');
+            const summarySavedVal = document.getElementById('summary-saved-val');
             const btnDlAll = document.getElementById('btn-dl-all');
+            const btnClear = document.getElementById('btn-clear');
             const themeToggle = document.getElementById('theme-toggle');
 
             let currentScale = 1.0;
@@ -629,9 +719,26 @@
 
             qualityInput.addEventListener('input', () => {
                 valQuality.textContent = `${qualityInput.value}%`;
+                updatePresetBtns(parseInt(qualityInput.value));
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(reprocessAll, 100);
             });
+
+            pillPresets.forEach(preset => {
+                preset.addEventListener('click', () => {
+                    const q = parseInt(preset.dataset.q);
+                    qualityInput.value = q;
+                    valQuality.textContent = `${q}%`;
+                    updatePresetBtns(q);
+                    reprocessAll();
+                });
+            });
+
+            function updatePresetBtns(q) {
+                pillPresets.forEach(p => {
+                    p.classList.toggle('active', parseInt(p.dataset.q) === q);
+                });
+            }
 
             selectFormat.addEventListener('change', reprocessAll);
 
@@ -693,12 +800,22 @@
                 if (!loadedImageObjects.length) return;
                 emptyState.style.display = 'none';
                 resultsHeader.style.display = 'flex';
+                summaryBanner.style.display = 'flex';
                 fileList.innerHTML = '';
                 compressedResults = [];
 
+                let totalOrigBytes = 0;
+                let totalCompBytes = 0;
+
                 loadedImageObjects.forEach((item) => {
-                    compressSingleImage(item.file, item.img);
+                    const res = compressSingleImage(item.file, item.img);
+                    totalOrigBytes += item.file.size;
+                    totalCompBytes += res.sizeInBytes;
                 });
+
+                const totalSavedBytes = Math.max(0, totalOrigBytes - totalCompBytes);
+                const totalSavingsPercent = totalOrigBytes > 0 ? Math.round((totalSavedBytes / totalOrigBytes) * 100) : 0;
+                summarySavedVal.textContent = `${formatBytes(totalSavedBytes)} Saved (-${totalSavingsPercent}%)`;
             }
 
             function compressSingleImage(file, img) {
@@ -730,10 +847,12 @@
                 const outName = baseName + '-compressed' + ext;
 
                 compressedResults.push({ name: outName, url: dataUrl });
-                renderFileCard(file.name, origSize, sizeInBytes, savings, dataUrl, outName);
+                renderFileCard(file.name, origSize, sizeInBytes, savings, dataUrl, outName, targetW, targetH);
+
+                return { sizeInBytes: sizeInBytes };
             }
 
-            function renderFileCard(origName, origSize, compSize, savings, dataUrl, outName) {
+            function renderFileCard(origName, origSize, compSize, savings, dataUrl, outName, w, h) {
                 const card = document.createElement('div');
                 card.className = 'file-card';
 
@@ -743,7 +862,7 @@
                         <div class="file-details">
                             <div class="file-name">${origName}</div>
                             <div class="file-meta">
-                                <span>${formatBytes(origSize)} → <strong>${formatBytes(compSize)}</strong></span>
+                                <span>${w}×${h}px • ${formatBytes(origSize)} → <strong>${formatBytes(compSize)}</strong></span>
                                 <span class="savings-tag">-${savings}%</span>
                             </div>
                         </div>
@@ -753,6 +872,15 @@
 
                 fileList.appendChild(card);
             }
+
+            btnClear.addEventListener('click', () => {
+                loadedImageObjects = [];
+                compressedResults = [];
+                fileList.innerHTML = '';
+                emptyState.style.display = 'block';
+                resultsHeader.style.display = 'none';
+                summaryBanner.style.display = 'none';
+            });
 
             btnDlAll.addEventListener('click', () => {
                 compressedResults.forEach(item => {
