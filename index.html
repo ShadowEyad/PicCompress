@@ -607,7 +607,7 @@
         </div>
     </footer>
 
-    <!-- Debounced Browser Compression Engine -->
+    <!-- Clean Async Compression Engine -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const dropzone = document.getElementById('dropzone');
@@ -623,16 +623,14 @@
             const themeToggle = document.getElementById('theme-toggle');
 
             let currentScale = 1.0;
-            let loadedFiles = [];
+            let loadedImageObjects = [];
             let compressedResults = [];
             let debounceTimer = null;
-            let loadedImageObjects = [];
 
-            // Debounced slider logic to prevent infinite reprocess loops
             qualityInput.addEventListener('input', () => {
                 valQuality.textContent = `${qualityInput.value}%`;
                 clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(reprocessAll, 120);
+                debounceTimer = setTimeout(reprocessAll, 100);
             });
 
             selectFormat.addEventListener('change', reprocessAll);
@@ -662,19 +660,24 @@
             });
 
             function handleFiles(files) {
-                Array.from(files).forEach(file => {
-                    if (file.type.startsWith('image/')) {
+                const newFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+                if (!newFiles.length) return;
+
+                const promises = newFiles.map(file => {
+                    return new Promise((resolve) => {
                         const reader = new FileReader();
                         reader.onload = (e) => {
                             const img = new Image();
-                            img.onload = () => {
-                                loadedImageObjects.push({ file: file, img: img });
-                                reprocessAll();
-                            };
+                            img.onload = () => resolve({ file: file, img: img });
                             img.src = e.target.result;
                         };
                         reader.readAsDataURL(file);
-                    }
+                    });
+                });
+
+                Promise.all(promises).then(results => {
+                    loadedImageObjects = loadedImageObjects.concat(results);
+                    reprocessAll();
                 });
             }
 
@@ -693,15 +696,15 @@
                 fileList.innerHTML = '';
                 compressedResults = [];
 
-                loadedImageObjects.forEach((item, idx) => {
-                    compressSingleImage(item.file, item.img, idx);
+                loadedImageObjects.forEach((item) => {
+                    compressSingleImage(item.file, item.img);
                 });
             }
 
-            function compressSingleImage(file, img, idx) {
+            function compressSingleImage(file, img) {
                 const canvas = document.createElement('canvas');
-                const targetW = Math.round(img.width * currentScale);
-                const targetH = Math.round(img.height * currentScale);
+                const targetW = Math.max(1, Math.round(img.width * currentScale));
+                const targetH = Math.max(1, Math.round(img.height * currentScale));
 
                 canvas.width = targetW;
                 canvas.height = targetH;
@@ -722,7 +725,8 @@
                 if (format === 'image/jpeg') ext = '.jpg';
                 else if (format === 'image/png') ext = '.png';
 
-                const baseName = file.name.contains && file.name.contains('.') ? file.name.substring(0, file.name.lastIndexOf('.')) : file.name;
+                const nameParts = file.name.split('.');
+                const baseName = nameParts.length > 1 ? nameParts.slice(0, -1).join('.') : file.name;
                 const outName = baseName + '-compressed' + ext;
 
                 compressedResults.push({ name: outName, url: dataUrl });
